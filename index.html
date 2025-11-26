@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Torneio de Clash 👑</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .btn-link {
+            display: block;
+            text-decoration: none;
+            color: inherit;
+            width: 100%;
+        }
+        .btn-link:hover {
+            text-decoration: none;
+            color: inherit;
+        }
+    </style>
+</head>
+<body>
+    <div class="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800">
+        <div class="max-w-2xl mx-auto px-4 py-8">
+            <!-- Imagem do Torneio -->
+            <div class="mb-8 rounded-lg overflow-hidden shadow-2xl">
+                <img 
+                    src="https://images.unsplash.com/photo-1542751371-adc38448a05e?w=800&q=80"
+                    alt="Torneio de Clash"
+                    class="w-full h-64 object-cover"
+                />
+            </div>
+
+            <!-- Título -->
+            <h1 class="text-white text-center mb-8 tracking-wider uppercase text-2xl">
+                Torneio de Clash 👑
+            </h1>
+
+            <!-- Cards de Ação -->
+            <div class="space-y-4">
+                <!-- Botão Como Participar -->
+                <button onclick="window.location.href='tutorial.html'" 
+                    class="w-full bg-white/5 backdrop-blur-md hover:bg-white/15 hover:scale-[1.02] text-white rounded-xl p-6 flex items-center gap-4 transition-all duration-300 shadow-lg border border-white/10 hover:border-white/30 hover:shadow-2xl">
+                    <div class="bg-white/20 backdrop-blur-sm p-3 rounded-full">
+                        <span class="text-2xl">📋</span>
+                    </div>
+                    <span class="text-xl">Como Participar</span>
+                </button>
+
+                <!-- Botão Pagar -->
+                <button onclick="window.location.href='payment.html'"
+                    class="w-full bg-white/5 backdrop-blur-md hover:bg-white/15 hover:scale-[1.02] text-white rounded-xl p-6 flex items-center gap-4 transition-all duration-300 shadow-lg border border-white/10 hover:border-white/30 hover:shadow-2xl">
+                    <div class="bg-white/20 backdrop-blur-sm p-3 rounded-full">
+                        <span class="text-2xl">💳</span>
+                    </div>
+                    <span class="text-xl">Pagar</span>
+                </button>
+
+                <!-- Botão Entrar no Grupo -->
+                <a href="https://chat.whatsapp.com/HQub9b6fZ0V1rxJm6Vjce7" class="btn-link">
+                    <button class="w-full bg-white/5 backdrop-blur-md hover:bg-white/15 hover:scale-[1.02] text-white rounded-xl p-6 flex items-center gap-4 transition-all duration-300 shadow-lg border border-white/10 hover:border-white/30 hover:shadow-2xl">
+                        <div class="bg-white/20 backdrop-blur-sm p-3 rounded-full">
+                            <span class="text-2xl">💬</span>
+                        </div>
+                        <span class="text-xl">Entrar no Grupo</span>
+                    </button>
+                </a>
+
+                <!-- Botão Ver Perfil TTK -->
+                <a href="https://www.tiktok.com/@azeitonatm" target="_blank" class="btn-link">
+                    <button class="w-full bg-white/5 backdrop-blur-md hover:bg-white/15 hover:scale-[1.02] text-white rounded-xl p-6 flex items-center gap-4 transition-all duration-300 shadow-lg border border-white/10 hover:border-white/30 hover:shadow-2xl">
+                        <div class="bg-white/20 backdrop-blur-sm p-3 rounded-full">
+                            <span class="text-2xl">👤</span>
+                        </div>
+                        <span class="text-xl">Ver Perfil do TTK</span>
+                    </button>
+                </a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

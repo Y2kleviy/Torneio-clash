@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pagamento - Torneio de Clash</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .btn-voltar { 
+            color: rgba(255, 255, 255, 0.7) !important; 
+            background: none;
+            border: none;
+            cursor: pointer;
+        }
+        .btn-voltar:hover { 
+            color: white !important; 
+        }
+        .hidden { display: none !important; }
+        
+        .qr-container {
+            width: 100%;
+            height: 320px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: white;
+            border-radius: 12px;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .qr-image {
+            max-width: 100%;
+            max-height: 100%;
+            width: auto;
+            height: auto;
+            border-radius: 8px;
+        }
+        
+        .payment-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .action-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .btn-primary {
+            margin-top: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 16px;
+            border: none;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+            min-height: 52px;
+        }
+
+        .btn-pix {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: white;
+        }
+
+        .btn-pix:hover {
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(59, 130, 246, 0.3);
+        }
+
+        .btn-verify {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+        }
+
+        .btn-verify:hover {
+            background: linear-gradient(135deg, #059669, #047857);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3);
+        }
+
+        .btn-copied {
+            background: linear-gradient(135deg, #059669, #047857) !important;
+        }
+
+        .btn-icon {
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+
+        .btn-text {
+            flex: 1;
+            text-align: center;
+        }
+
+        @media (max-width: 640px) {
+            .action-buttons {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+            
+            .btn-primary {
+                padding: 14px;
+                min-height: 48px;
+                font-size: 13px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800">
+        <div class="max-w-2xl mx-auto px-4 py-8">
+            <button onclick="window.location.href='index.html'" 
+                class="btn-voltar flex items-center gap-2 mb-8 transition-colors">
+                <span>←</span>
+                <span>Voltar ao Início</span>
+            </button>
+
+            <div class="payment-card rounded-2xl p-8 shadow-2xl">
+                <div class="text-center mb-8">
+                    <h2 class="text-white mb-2 tracking-wide uppercase text-2xl">Pagamento da Inscrição 👑</h2>
+                    <p class="text-white/60">Escaneie o QR Code ou use o PIX Copia e Cola</p>
+                </div>
+
+                <div class="text-center mb-8">
+                    <p class="text-white/60 mb-1">Valor da Inscrição</p>
+                    <p class="text-white text-2xl tracking-wider">R$ 5,00</p>
+                </div>
+
+                <div class="qr-container mb-6">
+                    <div id="loadingState" class="flex flex-col items-center justify-center text-gray-400">
+                        <div class="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                        <p>Gerando QR Code PIX...</p>
+                    </div>
+
+                    <div id="errorState" class="flex flex-col items-center justify-center text-red-500 hidden">
+                        <p id="errorMessage" class="text-center mb-4">Erro ao carregar pagamento</p>
+                        <button onclick="createPixCharge()"
+                            class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-lg transition-colors">
+                            Tentar Novamente
+                        </button>
+                    </div>
+
+                    <div id="successState" class="flex flex-col items-center justify-center hidden">
+                        <img id="qrCodeImage" 
+                             alt="QR Code PIX" 
+                             class="qr-image">
+                    </div>
+
+                    <div id="emptyState" class="flex flex-col items-center justify-center text-gray-400 hidden">
+                        <div class="w-48 h-48 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center mb-4">
+                            <span class="text-4xl">📱</span>
+                        </div>
+                        <p class="text-center">
+                            QR Code não carregado<br />Tente novamente
+                        </p>
+                    </div>
+                </div>
+
+                <div id="actionButtons" class="action-buttons hidden">
+                    <button onclick="copyPixCode()"
+                        class="btn-primary btn-pix"
+                        id="copyPixButton">
+                        <span class="btn-icon" id="copyIcon">📋</span>
+                        <span class="btn-text" id="copyText">Copiar Código PIX</span>
+                    </button>
+                    
+                    <button onclick="checkPaymentNow()"
+                        class="btn-primary btn-verify">
+                        <span class="btn-icon">🔄</span>
+                        <span class="btn-text">Verificar Pagamento</span>
+                    </button>
+                </div>
+
+                <div id="paymentStatus" class="mb-4 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg flex items-center justify-center gap-3 hidden">
+                    <div class="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                    <p id="statusText" class="text-blue-200 text-sm">Aguardando pagamento...</p>
+                </div>
+
+                <div class="space-y-3 text-white/70 text-sm mb-6">
+                    <p class="flex items-start gap-2">
+                        <span class="text-white/40">📱</span>
+                        <span><strong>Como pagar:</strong> Escaneie o QR Code com seu app bancário</span>
+                    </p>
+                    <p class="flex items-start gap-2">
+                        <span class="text-white/40">📋</span>
+                        <span><strong>Alternativa:</strong> Use "Copiar Código PIX" e cole no seu banco</span>
+                    </p>
+                    <p class="flex items-start gap-2">
+                        <span class="text-white/40">⏰</span>
+                        <span><strong>Tempo:</strong> Pagamento confirmado automaticamente em até 2 minutos</span>
+                    </p>
+                    <p class="flex items-start gap-2">
+                        <span class="text-white/40">✅</span>
+                        <span><strong>Confirmação:</strong> Redirecionamento automático quando confirmado</span>
+                    </p>
+                </div>
+
+                <div class="p-4 bg-gray-500/10 border border-gray-500/20 rounded-lg">
+                    <p class="text-gray-300 text-xs text-center">
+                        🔒 Pagamento seguro via PIX | 💰 Valor: R$ 5,00 | 🎯 Torneio de Clash Royale
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tela de Confirmação - CORRIGIDA -->
+    <div id="confirmationScreen" class="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 flex items-center justify-center px-4 hidden">
+        <div class="bg-white/10 backdrop-blur-lg rounded-2xl p-12 border border-white/20 shadow-2xl text-center max-w-md">
+            <div class="mb-6">
+                <div class="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <span class="text-3xl text-green-400">✓</span>
+                </div>
+                <h2 class="text-white text-2xl font-bold mb-3">Pagamento Confirmado! 🎉</h2>
+                <p class="text-white/60 mb-2">Sua inscrição foi confirmada com sucesso!</p>
+                <p class="text-white/40 text-sm">Agora você está participando do torneio</p>
+            </div>
+            
+            <div class="space-y-3">
+                <!-- BOTÃO CORRETO - ENVIAR COMPROVANTE PARA SEU NÚMERO -->
+                <button onclick="sendReceiptToAdmin()"
+                    class="w-full bg-green-600/20 hover:bg-green-600/30 text-green-400 rounded-lg p-4 transition-colors border border-green-500/30 flex items-center justify-center gap-2">
+                    <span>📱</span>
+                    <span>Enviar Comprovante ao Administrador</span>
+                </button>
+                
+                <button onclick="window.location.href='index.html'"
+                    class="w-full bg-white/10 hover:bg-white/20 text-white rounded-lg p-4 transition-colors border border-white/20">
+                    Voltar ao Início
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = '/api';
+        let currentTxid = null;
+        let paymentCheckInterval = null;
+        let paymentConfirmed = false;
+        let currentPixCode = '';
+
+        document.addEventListener('DOMContentLoaded', function() {
+            createPixCharge();
+        });
+
+        async function createPixCharge() {
+            try {
+                showState('loading');
+                
+                const response = await fetch(API_BASE_URL + '/pix-create.php', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'}
+                });
+
+                if (!response.ok) throw new Error('Erro ao conectar');
+                const data = await response.json();
+                
+                if (!data.success) throw new Error(data.error || 'Erro ao gerar QR Code');
+
+                currentTxid = data.txid;
+                currentPixCode = data.pixCopiaECola;
+                
+                document.getElementById('qrCodeImage').src = data.qrcode;
+                showState('success');
+                document.getElementById('actionButtons').classList.remove('hidden');
+                startPaymentPolling();
+                
+            } catch (error) {
+                document.getElementById('errorMessage').textContent = error.message;
+                showState('error');
+            }
+        }
+
+        async function checkPaymentStatus() {
+            if (!currentTxid || paymentConfirmed) return;
+
+            try {
+                const response = await fetch(API_BASE_URL + '/pix-check.php?txid=' + currentTxid);
+                if (!response.ok) return;
+                const data = await response.json();
+
+                if (data.success && data.paid) {
+                    paymentConfirmed = true;
+                    showConfirmation();
+                    stopPaymentPolling();
+                }
+            } catch (error) {}
+        }
+
+        function copyPixCode() {
+            if (!currentPixCode) return;
+            
+            navigator.clipboard.writeText(currentPixCode).then(() => {
+                const copyButton = document.getElementById('copyPixButton');
+                const copyIcon = document.getElementById('copyIcon');
+                const copyText = document.getElementById('copyText');
+                
+                copyButton.classList.add('btn-copied');
+                copyIcon.textContent = '✅';
+                copyText.textContent = 'Código Copiado!';
+                
+                setTimeout(() => {
+                    copyButton.classList.remove('btn-copied');
+                    copyIcon.textContent = '📋';
+                    copyText.textContent = 'Copiar Código PIX';
+                }, 2000);
+            });
+        }
+
+        function checkPaymentNow() {
+            if (paymentConfirmed) return;
+            document.getElementById('statusText').textContent = 'Verificando...';
+            checkPaymentStatus();
+        }
+
+        function showState(state) {
+            ['loadingState', 'errorState', 'successState', 'emptyState'].forEach(id => {
+                document.getElementById(id).classList.add('hidden');
+            });
+            document.getElementById('paymentStatus').classList.add('hidden');
+
+            if (state === 'loading') document.getElementById('loadingState').classList.remove('hidden');
+            if (state === 'error') document.getElementById('errorState').classList.remove('hidden');
+            if (state === 'success') {
+                document.getElementById('successState').classList.remove('hidden');
+                document.getElementById('paymentStatus').classList.remove('hidden');
+            }
+        }
+
+        function showConfirmation() {
+            document.querySelector('.min-h-screen.bg-gradient-to-b').classList.add('hidden');
+            document.getElementById('confirmationScreen').classList.remove('hidden');
+        }
+
+        // FUNÇÃO CORRIGIDA - ENVIA COMPROVANTE PARA SEU NÚMERO
+        function sendReceiptToAdmin() {
+            const adminNumber = "5581996367168"; // SEU NÚMERO
+            const message = "Olá! Gostaria de enviar o comprovante de pagamento da inscrição do torneio de Clash.";
+            const whatsappUrl = `https://wa.me/${adminNumber}?text=${encodeURIComponent(message)}`;
+            window.open(whatsappUrl, '_blank');
+        }
+
+        function startPaymentPolling() {
+            paymentCheckInterval = setInterval(() => {
+                if (!paymentConfirmed) checkPaymentStatus();
+                else stopPaymentPolling();
+            }, 5000);
+        }
+
+        function stopPaymentPolling() {
+            if (paymentCheckInterval) {
+                clearInterval(paymentCheckInterval);
+                paymentCheckInterval = null;
+            }
+        }
+
+        window.addEventListener('beforeunload', function() {
+            stopPaymentPolling();
+        });
+    </script>
+</body>
+</html>
