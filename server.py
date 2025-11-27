@@ -7,10 +7,10 @@ import os
 import requests
 
 CONFIG = {
-    'client_id': 'Client_Id_1c80de366e909ed1ef09d775d6b1ed77c529b397',
-    'client_secret': 'Client_Secret_5ac65711e16fdc9202b6ede88b710a65ed989aa2', 
-    'pix_key': '833c76b2-2494-463d-94ea-1bfd35905c2b',
-    'valor': '5.00',
+    'client_id': os.environ.get('CLIENT_ID_EFI', 'Client_Id_1c80de366e909ed1ef09d775d6b1ed77c529b397'),
+    'client_secret': os.environ.get('CLIENT_SECRET_EFI', 'Client_Secret_5ac65711e16fdc9202b6ede88b710a65ed989aa2'), 
+    'pix_key': os.environ.get('PIX_KEY', '833c76b2-2494-463d-94ea-1bfd35905c2b'),
+    'valor': os.environ.get('VALOR_PIX', '5.00'),
     'cert_path': 'producao-798531-clash_cert.pem',
     'key_path': 'producao-798531-clash_key.pem'
 }
@@ -153,7 +153,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             <rect width="256" height="256" fill="#f8f9fa"/>
             <rect x="20" y="20" width="216" height="40" fill="#0066cc" rx="8"/>
             <text x="128" y="45" font-family="Arial" font-size="14" text-anchor="middle" fill="white" font-weight="bold">
-                PIX - R$ 5,00
+                PIX - R$ {CONFIG['valor']}
             </text>
             <text x="128" y="100" font-family="Arial" font-size="12" text-anchor="middle" fill="#333" font-weight="bold">
                 CHAVE PIX:
@@ -169,7 +169,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             </text>
         </svg>'''
         
-        pix_copia_cola = f'00020126580014br.gov.bcb.pix0136{CONFIG["pix_key"]}52040000530398654045.005802BR5913TorneioClash6008SaoPaulo62070503***6304E2CA'
+        pix_copia_cola = f'00020126580014br.gov.bcb.pix0136{CONFIG["pix_key"]}5204000053039865404{CONFIG["valor"]}5802BR5913TorneioClash6008SaoPaulo62070503***6304E2CA'
         
         return {
             'txid': txid,
@@ -178,12 +178,13 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         }
 
 if __name__ == "__main__":
-    PORT = 8000
+    # Render usa porta da variável de ambiente
+    PORT = int(os.environ.get("PORT", 8000))
     with socketserver.TCPServer(("", PORT), Handler) as httpd:
         print("🌐 SERVIDOR TORNEIO CLASH ROYALE")
         print("=" * 50)
-        print(f"📍 Local: http://localhost:{PORT}")
+        print(f"📍 Porta: {PORT}")
         print(f"💰 PIX real funcionando!")
-        print("🎯 Todo Brasil pode acessar via ngrok")
+        print("🎯 Deploy profissional no Render!")
         print("=" * 50)
         httpd.serve_forever()
