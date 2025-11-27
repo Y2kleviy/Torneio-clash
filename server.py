@@ -5,6 +5,8 @@ import base64
 import uuid
 import os
 import requests
+import urllib.parse
+from urllib.parse import urlparse, parse_qs
 
 CONFIG = {
     'client_id': os.environ.get('CLIENT_ID_EFI', 'Client_Id_1c80de366e909ed1ef09d775d6b1ed77c529b397'),
@@ -61,11 +63,30 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self.send_header('Content-type', 'application/json')
             self.end_headers()
             
-            response = {
-                'success': True,
-                'paid': False,
-                'status': 'ATIVA'
-            }
+            # Extrai o txid da URL
+            parsed_url = urlparse(self.path)
+            query_params = parse_qs(parsed_url.query)
+            txid = query_params.get('txid', [None])[0]
+            
+            if txid:
+                # VERDADEIRA: Verifica se o PIX foi pago
+                paid = self.verificar_pix_pago(txid)
+                
+                # ⚠️ PARA TESTE: Sempre retorna True (comente a linha acima e descomente abaixo)
+                # paid = True
+                
+                response = {
+                    'success': True,
+                    'paid': paid,
+                    'status': 'CONCLUIDA' if paid else 'ATIVA'
+                }
+            else:
+                response = {
+                    'success': False,
+                    'paid': False,
+                    'error': 'TXID não fornecido'
+                }
+            
             self.wfile.write(json.dumps(response).encode())
         else:
             super().do_GET()
@@ -127,6 +148,32 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             print(f"Erro PIX real: {e}")
             return self.criar_pix_simulado()
 
+    def verificar_pix_pago(self, txid):
+        """Verifica se o PIX foi realmente pago na EFI"""
+        try:
+            access_token = self.obter_token_efi()
+            if access_token:
+                headers = {
+                    'Authorization': f'Bearer {access_token}',
+                    'Content-Type': 'application/json'
+                }
+                
+                response = requests.get(
+                    f'https://api-pix.gerencianet.com.br/v2/cob/{txid}',
+                    headers=headers,
+                    cert=(CONFIG['cert_path'], CONFIG['key_path']),
+                    verify=True,
+                    timeout=30
+                )
+                
+                if response.status_code == 200:
+                    cobranca = response.json()
+                    status = cobranca.get('status', 'ATIVA')
+                    return status == 'CONCLUIDA'
+        except Exception as e:
+            print(f"Erro verificação PIX: {e}")
+        return False
+
     def obter_token_efi(self):
         """Obtém token da EFI"""
         try:
@@ -185,6 +232,7 @@ if __name__ == "__main__":
         print("=" * 50)
         print(f"📍 Porta: {PORT}")
         print(f"💰 PIX real funcionando!")
+        print("✅ Verificação de pagamento ativa!")
         print("🎯 Deploy profissional no Render!")
         print("=" * 50)
         httpd.serve_forever()
