@@ -7,6 +7,8 @@ import os
 import requests
 import urllib.parse
 from urllib.parse import urlparse, parse_qs
+import threading
+import time
 
 CONFIG = {
     'client_id': os.environ.get('CLIENT_ID_EFI', 'Client_Id_1c80de366e909ed1ef09d775d6b1ed77c529b397'),
@@ -31,34 +33,32 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.send_response(200)
         self.end_headers()
 
-    def do_POST(self):
-        if self.path == '/api/pix-create.php':
+    def do_GET(self):
+        # ⭐ ROTA DE HEALTH CHECK (para auto-ping)
+        if self.path == '/health':
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
             self.end_headers()
-            
-            try:
-                qr_data = self.criar_pix_real()
-                response = {
-                    'success': True,
-                    'txid': qr_data['txid'],
-                    'qrcode': qr_data['qrcode'],
-                    'pixCopiaECola': qr_data['pix_copia_cola']
-                }
-            except Exception as e:
-                response = {
-                    'success': False,
-                    'error': str(e)
-                }
-            
+            response = {
+                'status': 'online', 
+                'timestamp': time.time(),
+                'app': 'Torneio Clash Royale',
+                'version': '1.0'
+            }
             self.wfile.write(json.dumps(response).encode())
-
-        else:
-            self.send_response(404)
+            return
+        
+        # ⭐ ROTA DE PING INTERNO (ativa o site)
+        elif self.path == '/wakeup':
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
             self.end_headers()
-
-    def do_GET(self):
-        if self.path.startswith('/api/pix-check.php'):
+            response = {'status': 'awake', 'message': 'Site ativado!'}
+            self.wfile.write(json.dumps(response).encode())
+            print("✅ Site foi ativado via ping interno")
+            return
+    
+        elif self.path.startswith('/api/pix-check.php'):
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
             self.end_headers()
@@ -90,6 +90,32 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self.wfile.write(json.dumps(response).encode())
         else:
             super().do_GET()
+
+    def do_POST(self):
+        if self.path == '/api/pix-create.php':
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            
+            try:
+                qr_data = self.criar_pix_real()
+                response = {
+                    'success': True,
+                    'txid': qr_data['txid'],
+                    'qrcode': qr_data['qrcode'],
+                    'pixCopiaECola': qr_data['pix_copia_cola']
+                }
+            except Exception as e:
+                response = {
+                    'success': False,
+                    'error': str(e)
+                }
+            
+            self.wfile.write(json.dumps(response).encode())
+
+        else:
+            self.send_response(404)
+            self.end_headers()
 
     def criar_pix_real(self):
         """Gera PIX real com certificado"""
@@ -224,15 +250,40 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             'pix_copia_cola': pix_copia_cola
         }
 
+def keep_alive_ping():
+    """Faz ping automático para manter site acordado"""
+    base_url = f"http://localhost:{PORT}"
+    
+    while True:
+        try:
+            # Tenta acordar o site
+            response = requests.get(f'{base_url}/wakeup', timeout=10)
+            if response.status_code == 200:
+                print(f"✅ Ping realizado - {time.strftime('%H:%M:%S')}")
+            else:
+                print(f"⚠️  Ping falhou - Status: {response.status_code}")
+                
+        except requests.exceptions.RequestException as e:
+            print(f"❌ Erro no ping: {e}")
+        
+        # Espera 4 minutos (240 segundos) entre pings
+        time.sleep(240)
+
 if __name__ == "__main__":
-    # Render usa porta da variável de ambiente
     PORT = int(os.environ.get("PORT", 8000))
+    
+    # Inicia thread de ping em background
+    print("🚀 Iniciando sistema de auto-acordar...")
+    ping_thread = threading.Thread(target=keep_alive_ping, daemon=True)
+    ping_thread.start()
+    
     with socketserver.TCPServer(("", PORT), Handler) as httpd:
         print("🌐 SERVIDOR TORNEIO CLASH ROYALE")
         print("=" * 50)
         print(f"📍 Porta: {PORT}")
         print(f"💰 PIX real funcionando!")
-        print("✅ Verificação de pagamento ativa!")
-        print("🎯 Deploy profissional no Render!")
+        print("🔔 Sistema de auto-acordar ATIVO!")
+        print("⏰ Ping automático a cada 4 minutos")
+        print("🎯 Site sempre rápido!")
         print("=" * 50)
         httpd.serve_forever()
