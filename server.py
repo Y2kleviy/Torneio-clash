@@ -4,19 +4,14 @@ import json
 import base64
 import uuid
 import os
-import requests
-import urllib.parse
-from urllib.parse import urlparse, parse_qs
-import threading
 import time
+from urllib.parse import urlparse, parse_qs
 
+# ⚠️ REMOVA AS CREDENCIAIS REAIS E CERTIFICADOS!
 CONFIG = {
-    'client_id': os.environ.get('CLIENT_ID_EFI', 'Client_Id_1c80de366e909ed1ef09d775d6b1ed77c529b397'),
-    'client_secret': os.environ.get('CLIENT_SECRET_EFI', 'Client_Secret_5ac65711e16fdc9202b6ede88b710a65ed989aa2'), 
-    'pix_key': os.environ.get('PIX_KEY', '833c76b2-2494-463d-94ea-1bfd35905c2b'),
-    'valor': os.environ.get('VALOR_PIX', '5.00'),
-    'cert_path': 'producao-798531-clash_cert.pem',
-    'key_path': 'producao-798531-clash_key.pem'
+    'valor': '0.01',  # Valor mínimo para demonstração
+    'demo_mode': True,  # FORÇA modo demonstração
+    'warning': '🚨 SISTEMA DE DEMONSTRAÇÃO - NÃO USA API REAL DA EFI 🚨'
 }
 
 class Handler(http.server.SimpleHTTPRequestHandler):
@@ -34,7 +29,6 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
-        # ⭐ ROTA DE HEALTH CHECK (para auto-ping)
         if self.path == '/health':
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
@@ -42,20 +36,19 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             response = {
                 'status': 'online', 
                 'timestamp': time.time(),
-                'app': 'Torneio Clash Royale',
-                'version': '1.0'
+                'app': 'Demo Portfólio',
+                'demo': True,
+                'warning': 'APENAS DEMONSTRAÇÃO - NÃO GERA PAGAMENTO REAL'
             }
             self.wfile.write(json.dumps(response).encode())
             return
         
-        # ⭐ ROTA DE PING INTERNO (ativa o site)
         elif self.path == '/wakeup':
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
             self.end_headers()
-            response = {'status': 'awake', 'message': 'Site ativado!'}
+            response = {'status': 'awake', 'demo': True}
             self.wfile.write(json.dumps(response).encode())
-            print("✅ Site foi ativado via ping interno")
             return
     
         elif self.path.startswith('/api/pix-check.php'):
@@ -63,28 +56,25 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self.send_header('Content-type', 'application/json')
             self.end_headers()
             
-            # Extrai o txid da URL
             parsed_url = urlparse(self.path)
             query_params = parse_qs(parsed_url.query)
             txid = query_params.get('txid', [None])[0]
             
             if txid:
-                # VERDADEIRA: Verifica se o PIX foi pago
-                paid = self.verificar_pix_pago(txid)
-                
-                # ⚠️ PARA TESTE: Sempre retorna True (comente a linha acima e descomente abaixo)
-                # paid = True
-                
+                # ⭐ SEMPRE retorna pagamento confirmado para demonstração
                 response = {
                     'success': True,
-                    'paid': paid,
-                    'status': 'CONCLUIDA' if paid else 'ATIVA'
+                    'paid': True,  # Pagamento simulado
+                    'status': 'CONCLUIDA',
+                    'demo': True,
+                    'message': 'Pagamento simulado para portfólio',
+                    'warning': 'Este é um sistema de demonstração'
                 }
             else:
                 response = {
                     'success': False,
                     'paid': False,
-                    'error': 'TXID não fornecido'
+                    'demo': True
                 }
             
             self.wfile.write(json.dumps(response).encode())
@@ -98,151 +88,102 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             
             try:
-                qr_data = self.criar_pix_real()
+                qr_data = self.criar_pix_simulado()
                 response = {
                     'success': True,
                     'txid': qr_data['txid'],
                     'qrcode': qr_data['qrcode'],
-                    'pixCopiaECola': qr_data['pix_copia_cola']
+                    'pixCopiaECola': qr_data['pix_copia_cola'],
+                    'demo': True,
+                    'warning': 'QR Code de demonstração - Não gera pagamento real'
                 }
             except Exception as e:
                 response = {
                     'success': False,
-                    'error': str(e)
+                    'error': str(e),
+                    'demo': True
                 }
             
             self.wfile.write(json.dumps(response).encode())
-
         else:
             self.send_response(404)
             self.end_headers()
 
-    def criar_pix_real(self):
-        """Gera PIX real com certificado"""
-        try:
-            # Tenta EFI real primeiro
-            access_token = self.obter_token_efi()
-            if access_token:
-                txid = str(uuid.uuid4()).replace('-', '')[:35]
-                
-                payload = {
-                    "calendario": {"expiracao": 3600},
-                    "devedor": {"cpf": "12345678909", "nome": "Jogador Torneio"},
-                    "valor": {"original": CONFIG['valor']},
-                    "chave": CONFIG['pix_key'],
-                    "solicitacaoPagador": f"Torneio Clash - {txid}"
-                }
-
-                headers = {
-                    'Authorization': f'Bearer {access_token}',
-                    'Content-Type': 'application/json'
-                }
-
-                response = requests.put(
-                    f'https://api-pix.gerencianet.com.br/v2/cob/{txid}',
-                    json=payload,
-                    headers=headers,
-                    cert=(CONFIG['cert_path'], CONFIG['key_path']),
-                    verify=True,
-                    timeout=30
-                )
-
-                if response.status_code == 201:
-                    cobranca = response.json()
-                    location_id = cobranca['loc']['id']
-                    
-                    qr_response = requests.get(
-                        f'https://api-pix.gerencianet.com.br/v2/loc/{location_id}/qrcode',
-                        headers=headers,
-                        cert=(CONFIG['cert_path'], CONFIG['key_path']),
-                        verify=True,
-                        timeout=30
-                    )
-                    
-                    if qr_response.status_code == 200:
-                        qr_data = qr_response.json()
-                        return {
-                            'txid': txid,
-                            'qrcode': qr_data['imagemQrcode'],
-                            'pix_copia_cola': qr_data['qrcode']
-                        }
-            
-            # Se falhar, usa simulação
-            return self.criar_pix_simulado()
-            
-        except Exception as e:
-            print(f"Erro PIX real: {e}")
-            return self.criar_pix_simulado()
-
-    def verificar_pix_pago(self, txid):
-        """Verifica se o PIX foi realmente pago na EFI"""
-        try:
-            access_token = self.obter_token_efi()
-            if access_token:
-                headers = {
-                    'Authorization': f'Bearer {access_token}',
-                    'Content-Type': 'application/json'
-                }
-                
-                response = requests.get(
-                    f'https://api-pix.gerencianet.com.br/v2/cob/{txid}',
-                    headers=headers,
-                    cert=(CONFIG['cert_path'], CONFIG['key_path']),
-                    verify=True,
-                    timeout=30
-                )
-                
-                if response.status_code == 200:
-                    cobranca = response.json()
-                    status = cobranca.get('status', 'ATIVA')
-                    return status == 'CONCLUIDA'
-        except Exception as e:
-            print(f"Erro verificação PIX: {e}")
-        return False
-
-    def obter_token_efi(self):
-        """Obtém token da EFI"""
-        try:
-            auth = (CONFIG['client_id'], CONFIG['client_secret'])
-            response = requests.post(
-                'https://api-pix.gerencianet.com.br/oauth/token',
-                data={'grant_type': 'client_credentials'},
-                auth=auth,
-                cert=(CONFIG['cert_path'], CONFIG['key_path']),
-                verify=True,
-                timeout=30
-            )
-            if response.status_code == 200:
-                return response.json()['access_token']
-        except:
-            pass
-        return None
-
     def criar_pix_simulado(self):
-        """Fallback com QR simulado"""
-        txid = f'txid_{uuid.uuid4().hex[:16]}'
+        """Gera QR Code PIX FICTÍCIO para demonstração"""
+        txid = f'demo_{uuid.uuid4().hex[:12]}'
+        valor = "5.00"
         
-        svg_content = f'''<svg width="256" height="256" viewBox="0 0 256 256">
+        # QR Code estático com avisos visíveis
+        svg_content = f'''<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style="stop-color:#1f2937;stop-opacity:1" />
+                    <stop offset="100%" style="stop-color:#111827;stop-opacity:1" />
+                </linearGradient>
+            </defs>
+            
+            <!-- Fundo -->
             <rect width="256" height="256" fill="#f8f9fa"/>
-            <rect x="20" y="20" width="216" height="40" fill="#0066cc" rx="8"/>
-            <text x="128" y="45" font-family="Arial" font-size="14" text-anchor="middle" fill="white" font-weight="bold">
-                PIX - R$ {CONFIG['valor']}
+            
+            <!-- Cartão principal -->
+            <rect x="10" y="10" width="236" height="236" fill="url(#grad1)" rx="12"/>
+            
+            <!-- Título -->
+            <text x="128" y="45" text-anchor="middle" fill="white" 
+                  font-family="Arial, sans-serif" font-size="16" font-weight="bold">
+                PIX DEMONSTRAÇÃO
             </text>
-            <text x="128" y="100" font-family="Arial" font-size="12" text-anchor="middle" fill="#333" font-weight="bold">
-                CHAVE PIX:
+            
+            <!-- Linha divisória -->
+            <line x1="30" y1="55" x2="226" y2="55" stroke="#4b5563" stroke-width="1"/>
+            
+            <!-- Valor -->
+            <text x="128" y="85" text-anchor="middle" fill="#9ca3af" 
+                  font-family="Arial, sans-serif" font-size="12">
+                VALOR
             </text>
-            <text x="128" y="120" font-family="Arial" font-size="10" text-anchor="middle" fill="#666">
-                {CONFIG['pix_key']}
+            <text x="128" y="105" text-anchor="middle" fill="white" 
+                  font-family="Arial, sans-serif" font-size="20" font-weight="bold">
+                R$ {valor}
             </text>
-            <text x="128" y="180" font-family="Arial" font-size="11" text-anchor="middle" fill="#0066cc">
-                Pague com PIX Copia e Cola
+            
+            <!-- Chave PIX fictícia -->
+            <text x="128" y="130" text-anchor="middle" fill="#9ca3af" 
+                  font-family="Arial, sans-serif" font-size="11">
+                CHAVE PIX (DEMO)
             </text>
-            <text x="128" y="200" font-family="Arial" font-size="9" text-anchor="middle" fill="#999">
-                Torneio Clash Royale
+            <text x="128" y="150" text-anchor="middle" fill="#60a5fa" 
+                  font-family="Arial, sans-serif" font-size="10">
+                demo.portfolio@pix.com
             </text>
+            
+            <!-- TXID -->
+            <text x="128" y="170" text-anchor="middle" fill="#9ca3af" 
+                  font-family="Arial, sans-serif" font-size="10">
+                ID: {txid}
+            </text>
+            
+            <!-- Aviso de demonstração -->
+            <rect x="30" y="180" width="196" height="40" fill="#f59e0b" rx="6" opacity="0.9"/>
+            <text x="128" y="195" text-anchor="middle" fill="#000" 
+                  font-family="Arial, sans-serif" font-size="10" font-weight="bold">
+                ⚠️ APENAS DEMONSTRAÇÃO
+            </text>
+            <text x="128" y="210" text-anchor="middle" fill="#000" 
+                  font-family="Arial, sans-serif" font-size="9">
+                Não gera pagamento real
+            </text>
+            
+            <!-- Padrões decorativos (não funcionais) -->
+            <rect x="40" y="40" width="12" height="12" fill="#3b82f6" rx="2"/>
+            <rect x="204" y="40" width="12" height="12" fill="#3b82f6" rx="2"/>
+            <rect x="40" y="204" width="12" height="12" fill="#3b82f6" rx="2"/>
+            
         </svg>'''
         
-        pix_copia_cola = f'00020126580014br.gov.bcb.pix0136{CONFIG["pix_key"]}5204000053039865404{CONFIG["valor"]}5802BR5913TorneioClash6008SaoPaulo62070503***6304E2CA'
+        # Código PIX fictício (não funciona)
+        pix_copia_cola = f'00020126580014BR.GOV.BCB.PIX0136demo.portfolio@pix.com5204000053039865406{valor.replace(".", "")}5802BR5915DEMO-PORTFOLIO6014SAO-PAULO-SP62070503DEM6304ABCD'
         
         return {
             'txid': txid,
@@ -251,39 +192,39 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         }
 
 def keep_alive_ping():
-    """Faz ping automático para manter site acordado"""
+    """Ping automático para manter Render ativo"""
+    import requests
+    
     base_url = f"http://localhost:{PORT}"
     
     while True:
         try:
-            # Tenta acordar o site
-            response = requests.get(f'{base_url}/wakeup', timeout=10)
-            if response.status_code == 200:
-                print(f"✅ Ping realizado - {time.strftime('%H:%M:%S')}")
-            else:
-                print(f"⚠️  Ping falhou - Status: {response.status_code}")
-                
-        except requests.exceptions.RequestException as e:
-            print(f"❌ Erro no ping: {e}")
+            requests.get(f'{base_url}/wakeup', timeout=5)
+            print(f"✅ Ping - {time.strftime('%H:%M:%S')}")
+        except:
+            pass
         
-        # Espera 4 minutos (240 segundos) entre pings
-        time.sleep(240)
+        time.sleep(240)  # 4 minutos
 
 if __name__ == "__main__":
     PORT = int(os.environ.get("PORT", 8000))
     
-    # Inicia thread de ping em background
-    print("🚀 Iniciando sistema de auto-acordar...")
-    ping_thread = threading.Thread(target=keep_alive_ping, daemon=True)
-    ping_thread.start()
+    # Inicia ping em background (apenas se necessário)
+    try:
+        ping_thread = threading.Thread(target=keep_alive_ping, daemon=True)
+        ping_thread.start()
+        print("🔔 Sistema de ping ativado")
+    except:
+        pass
     
     with socketserver.TCPServer(("", PORT), Handler) as httpd:
-        print("🌐 SERVIDOR TORNEIO CLASH ROYALE")
-        print("=" * 50)
-        print(f"📍 Porta: {PORT}")
-        print(f"💰 PIX real funcionando!")
-        print("🔔 Sistema de auto-acordar ATIVO!")
-        print("⏰ Ping automático a cada 4 minutos")
-        print("🎯 Site sempre rápido!")
-        print("=" * 50)
+        print("=" * 60)
+        print("🌐 DEMO PIX - PORTFÓLIO SEGURO")
+        print("📍 Porta:", PORT)
+        print("💰 MODO: DEMONSTRAÇÃO (100% SIMULADO)")
+        print("🔒 SEGURANÇA: Sem credenciais reais")
+        print("🎯 FINALIDADE: Exemplo para portfólio")
+        print("=" * 60)
+        print("⚠️  AVISO: Este sistema NÃO processa pagamentos reais")
+        print("=" * 60)
         httpd.serve_forever()
